@@ -322,8 +322,6 @@ describe('Dataset', function() {
           expect(Transport).toHaveBeenCalledWith(ajaxSetting);
         });
       });
-
-
     });
   });
 

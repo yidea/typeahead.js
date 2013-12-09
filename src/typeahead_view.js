@@ -60,6 +60,8 @@ var TypeaheadView = (function() {
   function TypeaheadView(o) {
     var $menu, $input, $hint;
 
+    var allowHint = o.datasets[0].allowHint;
+
     utils.bindAll(this);
 
     this.$node = buildDomStructure(o.input);
@@ -74,27 +76,26 @@ var TypeaheadView = (function() {
 
     this.dropdownView = new DropdownView({ menu: $menu })
     .on('suggestionSelected', this._handleSelection)
-    .on('cursorMoved', this._clearHint)
     .on('cursorMoved', this._setInputValueToSuggestionUnderCursor)
     .on('cursorRemoved', this._setInputValueToQuery)
-    .on('cursorRemoved', this._updateHint)
-    .on('suggestionsRendered', this._updateHint)
-    .on('opened', this._updateHint)
-    .on('closed', this._clearHint)
     .on('opened closed', this._propagateEvent);
+
+    if (allowHint) {
+      this.dropdownView
+      .on('cursorMoved', this._clearHint)
+      .on('cursorRemoved', this._updateHint)
+      .on('suggestionsRendered', this._updateHint)
+      .on('opened', this._updateHint)
+      .on('closed', this._clearHint);
+    }
 
     this.inputView = new InputView({ input: $input, hint: $hint })
     .on('focused', this._openDropdown)
     .on('blured', this._closeDropdown)
     .on('blured', this._setInputValueToQuery)
     .on('enterKeyed tabKeyed', this._handleSelection)
-        
-    .on('queryChanged', this._clearHint)
     .on('queryChanged', this._getSuggestions)
-//    .on('queryChanged', this._clearSuggestions)  //removed
-    .on('queryChangedEmpty', this._clearSuggestions)
-
-    .on('whitespaceChanged', this._updateHint)
+    .on('queryChangedEmpty', this._clearSuggestions) //modified to solve blinking issue
     .on('queryChanged whitespaceChanged', this._openDropdown)
     .on('queryChanged whitespaceChanged', this._setLanguageDirection)
     .on('escKeyed', this._closeDropdown)
@@ -103,6 +104,12 @@ var TypeaheadView = (function() {
     .on('upKeyed downKeyed', this._moveDropdownCursor)
     .on('upKeyed downKeyed', this._openDropdown)
     .on('tabKeyed leftKeyed rightKeyed', this._autocomplete);
+
+    if (allowHint) {
+      this.inputView
+      .on('queryChanged', this._clearHint)
+      .on('whitespaceChanged', this._updateHint);
+    }
   }
 
   utils.mixin(TypeaheadView.prototype, EventTarget, {
@@ -233,32 +240,36 @@ var TypeaheadView = (function() {
       
       utils.each(this.datasets, function(i, dataset) {
 
-        dataset.getSuggestions(query, function(suggestions, source) {
+        dataset.getSuggestions(query, function(suggestions, remote) {
           // only render the suggestions if the view hasn't
           // been destroyed and if the query hasn't changed
 
-//          if (that.$node && query === that.inputView.getQuery()) {
-//            that.dropdownView.renderSuggestions(dataset, suggestions, query);
-//          }
-
-          console.log(source, suggestions); //TODO:debug
-
-          if (source === 'remote') {
+          if (remote) {
             if (suggestions.length) {
-              if (that.$node && query === that.inputView.getQuery()) {
-                that.dropdownView.renderSuggestions(dataset, suggestions, query);
-              }
-            } else {
-              that.dropdownView.clearSuggestions();
+              _dropdownViewRender.call(that, query, dataset, suggestions);
             }
 
-          } else { //local
-            if (that.$node && query === that.inputView.getQuery()) {
-              that.dropdownView.renderSuggestions(dataset, suggestions, query);
+            else {
+              _dropdownViewClear.call(that);
             }
+          }
+
+          //local & prefetch
+          else {
+            _dropdownViewRender.call(that, query, dataset, suggestions);
           }
         });
       });
+
+      function _dropdownViewRender(query, dataset, suggestions) {
+        if (this.$node && query === this.inputView.getQuery()) {
+          this.dropdownView.renderSuggestions(dataset, suggestions, query);
+        }
+      }
+
+      function _dropdownViewClear() {
+        this.dropdownView.clearSuggestions();
+      }
     },
 
     _autocomplete: function(e) {

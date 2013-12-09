@@ -48,6 +48,9 @@ var Dataset = (function() {
 
     // support duplicate
     this.allowDuplicate = !!o.allowDuplicate;
+
+    // support hint
+    this.allowHint = !!o.allowHint;
   }
 
   utils.mixin(Dataset.prototype, {
@@ -262,8 +265,6 @@ var Dataset = (function() {
     getSuggestions: function(query, cb) {
       var that = this, terms, suggestions, cacheHit;
 
-//      debugger;
-
       // don't do anything until the minLength constraint is met
       if (query.length < this.minLength) {
         return;
@@ -295,7 +296,9 @@ var Dataset = (function() {
           // checks for duplicates
           if (that.allowDuplicate) {
             suggestions.push(item);
-          } else {
+          }
+
+          else {
             isDuplicate = utils.some(suggestions, function(suggestion) {
               return item.value === suggestion.value;
             });
@@ -308,7 +311,7 @@ var Dataset = (function() {
           return suggestions.length < that.limit;
         });
         
-        cb && cb(suggestions, 'remote');
+        cb && cb(suggestions, true); //remote indicator
       }
     }
   });
