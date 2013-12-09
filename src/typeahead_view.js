@@ -60,11 +60,11 @@ var TypeaheadView = (function() {
   function TypeaheadView(o) {
     var $menu, $input, $hint;
 
-    var allowHint = o.datasets[0].allowHint;
+    this.allowHint = o.datasets[0].allowHint;
 
     utils.bindAll(this);
 
-    this.$node = buildDomStructure(o.input);
+    this.$node = buildDomStructure(o.input, this.allowHint);
     this.datasets = o.datasets;
     this.dir = null;
 
@@ -80,7 +80,7 @@ var TypeaheadView = (function() {
     .on('cursorRemoved', this._setInputValueToQuery)
     .on('opened closed', this._propagateEvent);
 
-    if (allowHint) {
+    if (this.allowHint) {
       this.dropdownView
       .on('cursorMoved', this._clearHint)
       .on('cursorRemoved', this._updateHint)
@@ -105,7 +105,7 @@ var TypeaheadView = (function() {
     .on('upKeyed downKeyed', this._openDropdown)
     .on('tabKeyed leftKeyed rightKeyed', this._autocomplete);
 
-    if (allowHint) {
+    if (this.allowHint) {
       this.inputView
       .on('queryChanged', this._clearHint)
       .on('whitespaceChanged', this._updateHint);
@@ -124,9 +124,13 @@ var TypeaheadView = (function() {
 
       switch (e.type) {
         case 'tabKeyed':
-          hint = this.inputView.getHintValue();
           inputValue = this.inputView.getInputValue();
-          preventDefault = hint && hint !== inputValue;
+
+          if (this.allowHint) {
+            hint = this.inputView.getHintValue();
+            preventDefault = hint && hint !== inputValue;
+          }
+
           break;
 
         case 'upKeyed':
@@ -284,17 +288,20 @@ var TypeaheadView = (function() {
       }
 
       query = this.inputView.getQuery();
-      hint = this.inputView.getHintValue();
 
-      if (hint !== '' && query !== hint) {
-        suggestion = this.dropdownView.getFirstSuggestion();
-        this.inputView.setInputValue(suggestion.value);
+      if (this.allowHint) {
+        hint = this.inputView.getHintValue();
 
-        this.eventBus.trigger(
-          'autocompleted',
-          suggestion.datum,
-          suggestion.dataset
-        );
+        if (hint !== '' && query !== hint) {
+          suggestion = this.dropdownView.getFirstSuggestion();
+          this.inputView.setInputValue(suggestion.value);
+
+          this.eventBus.trigger(
+              'autocompleted',
+              suggestion.datum,
+              suggestion.dataset
+          );
+        }
       }
     },
 
@@ -318,7 +325,10 @@ var TypeaheadView = (function() {
       this.inputView.setQuery(query);
       this.inputView.setInputValue(query);
 
-      this._clearHint();
+      if (this.allowHint) {
+        this._clearHint();
+      }
+
       this._clearSuggestions();
       this._getSuggestions();
     }
@@ -326,28 +336,31 @@ var TypeaheadView = (function() {
 
   return TypeaheadView;
 
-  function buildDomStructure(input) {
+  function buildDomStructure(input, allowHint) {
     var $wrapper = $(html.wrapper),
         $dropdown = $(html.dropdown),
         $input = $(input),
-        $hint = $(html.hint);
+        $hint;
 
     $wrapper = $wrapper.css(css.wrapper);
     $dropdown = $dropdown.css(css.dropdown);
 
-    $hint
-    .css(css.hint)
-    // copy background styles from query input to hint input
-    .css({
-      backgroundAttachment: $input.css('background-attachment'),
-      backgroundClip: $input.css('background-clip'),
-      backgroundColor: $input.css('background-color'),
-      backgroundImage: $input.css('background-image'),
-      backgroundOrigin: $input.css('background-origin'),
-      backgroundPosition: $input.css('background-position'),
-      backgroundRepeat: $input.css('background-repeat'),
-      backgroundSize: $input.css('background-size')
-    });
+    if (allowHint) {
+      $hint = $(html.hint);
+      $hint
+      .css(css.hint)
+      // copy background styles from query input to hint input
+      .css({
+        backgroundAttachment: $input.css('background-attachment'),
+        backgroundClip: $input.css('background-clip'),
+        backgroundColor: $input.css('background-color'),
+        backgroundImage: $input.css('background-image'),
+        backgroundOrigin: $input.css('background-origin'),
+        backgroundPosition: $input.css('background-position'),
+        backgroundRepeat: $input.css('background-repeat'),
+        backgroundSize: $input.css('background-size')
+      });
+    }
 
     // store the original values of the attrs that get modified
     // so modifications can be reverted on destroy
@@ -367,11 +380,13 @@ var TypeaheadView = (function() {
     // it does not like it one bit
     try { !$input.attr('dir') && $input.attr('dir', 'auto'); } catch (e) {}
 
-    return $input
-    .wrap($wrapper)
-    .parent()
-    .prepend($hint)
-    .append($dropdown);
+    var $dom = $input
+        .wrap($wrapper)
+        .parent()
+        .prepend($hint)
+        .append($dropdown);
+
+    return $dom;
   }
 
   function destroyDomStructure($node) {
